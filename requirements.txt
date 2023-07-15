@@ -1,0 +1,7 @@
+pydantic
+pydantic-extra-types
+attrs
+aiohttp
+websockets
+python-dateutil
+cacheout
