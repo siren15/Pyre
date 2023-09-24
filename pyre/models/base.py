@@ -10,8 +10,6 @@ if TYPE_CHECKING:
     from .file import UPLOADABLE_TYPE
     from .embed import Embed
 
-FUF = ForwardRef("UploadableFile")
-
 def delete_key(dict_key:str, d: Dict):
     """Delete any instance of key from dictionary, and it's nested dictionaries"""
     if isinstance(d, dict):
@@ -52,8 +50,8 @@ class SendableObject(PyreObject):
 
     async def send(self,
                    content: str = None,
-                   file: UPLOADABLE_TYPE = None,
-                   attachments: List[UPLOADABLE_TYPE] = [],
+                   file: "UPLOADABLE_TYPE" = None,
+                   attachments: List["UPLOADABLE_TYPE"] = [],
                    replies: List["Reply"] = None,
                    embed: "Embed" = None,
                    embeds: List["Embed"] = [],
@@ -123,7 +121,7 @@ class MessageEvent(PyreEvent):
         return self.client.cache.get_message(self.channel_id, self.message_id)
     
     async def reply(self, content: str = None, 
-                    attachments: List[FUF | str] = None,
+                    attachments: List["UPLOADABLE_TYPE"] = [],
                     embeds: List["Embed"] = None,
                     masquerade: "Masquerade" = None,
                     interactions: "Interactions" = None,

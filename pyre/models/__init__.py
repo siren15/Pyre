@@ -12,3 +12,4 @@ from .role import *
 from .server import *
 from .emoji import *
 from .client_events import *
+from .command import *

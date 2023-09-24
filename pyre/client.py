@@ -18,6 +18,7 @@ class PyreClient:
         self.default_events = self.ws.default_events
         self.http.client = self
         self.prefixes = prefixes
+        self.commands: List[models.BaseCommand] = []
 
 
     async def astart(self):
@@ -29,7 +30,18 @@ class PyreClient:
         asyncio.run(self.astart())
 
     def listen(self, model: models.PyreEvent):
-
+        """
+        The listen function is a decorator that allows you to listen for events.
+        It takes in a model as an argument, and returns the callback function with the event name and model attached to it.
+        The event name is used by Pyre when sending out events, so that only listeners listening for that specific event will be called.
+        
+        Args:
+            self: Refer to the object itself
+            model: models.PyreEvent: Specify the type of event that will be listened for
+        
+        Returns:
+            A decorator, which is a function that takes in another function and returns it
+        """
         def decorator(callback):
             if not asyncio.iscoroutinefunction(callback):
                 raise TypeError("Listener must be a coroutine")
@@ -37,7 +49,16 @@ class PyreClient:
             listener = models.Listener(event_name, model, callback)
             self.events.append(listener)
             return callback
-
+        return decorator
+    
+    def command(self, name: str = None, description: str = "No description", aliases: List[str] = []):
+        def decorator(callback):
+            if not asyncio.iscoroutinefunction(callback):
+                raise TypeError("Command must be a coroutine")
+            if not name:
+                name = callback.__name__
+            args = callback.
+            cmd = models.BaseCommand(wsclient=self, name=name, description=description, aliases=aliases, args=)
         return decorator
 
     def register_default_listeners(self):
@@ -245,3 +266,6 @@ class PyreClient:
             for channel in server.channels:
                 idr = r"^[a-zA-Z0-9_-]+$"
                 self.cache.messages.delete_many((channel.id, re.compile(idr)))
+
+    async def resolve_command(self, event: models.Message):
+        pass

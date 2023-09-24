@@ -2,7 +2,6 @@ from typing import Dict, Literal, Optional, Any, List, Union
 from pydantic import ConfigDict, Field as field, BaseModel
 from .base import PyreObject
 from .file import File, UPLOADABLE_TYPE
-from tabulate import tabulate
 
 
 class EmbedImage(PyreObject):

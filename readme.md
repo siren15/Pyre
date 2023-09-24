@@ -28,6 +28,7 @@ I want to achieve a wrapper that will be stable, easy to use and understand.
 ---
 
 **Example usage:**
+`Python 3.10+ needed.`
 
 ```python
 import os
