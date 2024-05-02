@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List
 
 class Permissions(Enum):
-    """The following permissions are currently allocated"""
+    """Permissions a user or role may have."""
     MANAGE_CHANNEL = 1 << 0
     """Manage the channel or channels on the server"""
     MANAGE_SERVER = 1 << 1
@@ -68,7 +68,7 @@ class Permissions(Enum):
         present_permissions = []
         for enum_name, enum_value in cls.__members__.items():
             if permissions_value & enum_value.value > 0:
-                present_permissions.append(enum_name)
+                present_permissions.append(cls[enum_name])
         return present_permissions
 
     @classmethod

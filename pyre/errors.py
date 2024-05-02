@@ -25,5 +25,14 @@ class AlreadyAuthenticated(PyreError):
 class InvalidDisplayName(PyreError):
     """Display name is invalid"""
 
+
 class HTTPError(PyreError):
-    """Display name is invalid"""
+    """HTTP Error"""
+
+
+class PermissionError(PyreError):
+    """User does not have the required permissions"""
+
+
+class ValidationError(PyreError):
+    """User input is invalid"""

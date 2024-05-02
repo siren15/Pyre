@@ -1,15 +1,23 @@
 import asyncio
 import inspect
-from .ws import WSClient
 import pyre.models as models
+import re
+
 from pydantic_extra_types import color
 from typing import List
-import re
+
+from .ws import WSClient
+from .enums import Permissions
+from .errors import PermissionError, ValidationError
 
 
 class PyreClient:
-
-    def __init__(self, token:str, prefixes:List[str]=None):
+    """The bot client.
+    Args:
+        token (str): The bot token.
+        prefixes (List[str]): The bot prefixes.
+    """
+    def __init__(self, token: str, prefixes: List[str] = []):
         self.token = token
         self.ws = WSClient(self.token)
         self.cache = self.ws.cache
@@ -22,13 +30,13 @@ class PyreClient:
         self.commands: List[models.BaseCommand] = []
         self.extensions = []
 
-
     async def astart(self):
         self.register_default_listeners()
         await self.http.login()
         await self.ws.connect()
 
     def start(self):
+        """Start the client"""
         asyncio.run(self.astart())
 
     def listen(self, model: models.PyreEvent):
@@ -44,6 +52,7 @@ class PyreClient:
         Returns:
             A decorator, which is a function that takes in another function and returns it
         """
+
         def decorator(callback):
             if not asyncio.iscoroutinefunction(callback):
                 raise TypeError("Listener must be a coroutine")
@@ -51,9 +60,25 @@ class PyreClient:
             listener = models.Listener(event_name, model, callback)
             self.events.append(listener)
             return callback
+
         return decorator
-    
-    def command(self, name: str = None, description: str = "No description", aliases: List[str] = []):
+
+    def command(
+        self,
+        name: str = None,
+        description: str = "No description",
+        aliases: List[str] = [],
+        default_permissions: List[Permissions] = [],
+    ):
+        """A decorator that allows you to register a command.
+        Args:
+            self: Refer to the object itself
+            name: str: The name of the command
+            description: str: The description of the command
+            aliases: List[str]: The aliases of the command
+            default_permissions: List[Permissions]: The permissions Members will have to have to run the command
+        """
+
         def decorator(callback):
             if not asyncio.iscoroutinefunction(callback):
                 raise TypeError("Command must be a coroutine")
@@ -69,23 +94,23 @@ class PyreClient:
                     continue
                 if not issubclass(param.annotation, models.CommandContext):
                     arg = models.CommandArg(
-                            name=param_name,
-                            type=param.annotation if param.annotation != inspect.Parameter.empty else str
-                        )
+                        name=param_name,
+                        type=param.annotation if param.annotation
+                        != inspect.Parameter.empty else str)
                     args.append(arg)
             # Create and register the command
-            cmd = models.BaseCommand(
-                wsclient=self.ws,
-                name=command_name,
-                description=description,
-                aliases=aliases,
-                args=args,
-                callback=callback
-            )
+            cmd = models.BaseCommand(wsclient=self.ws,
+                                     name=command_name,
+                                     description=description,
+                                     aliases=aliases,
+                                     args=args,
+                                     callback=callback,
+                                     default_permissions=default_permissions)
             self.commands.append(cmd)
 
             # Return the original callback
             return callback
+
         return decorator
 
     def register_default_listeners(self):
@@ -94,7 +119,8 @@ class PyreClient:
         self.ws.add_default_event(models.MessageDelete, self.cache_messages)
         #
         self.ws.add_default_event(models.ServerMemberJoin, self.cache_members)
-        self.ws.add_default_event(models.ServerMemberUpdate, self.cache_members)
+        self.ws.add_default_event(models.ServerMemberUpdate,
+                                  self.cache_members)
         self.ws.add_default_event(models.ServerMemberLeave, self.cache_members)
         self.ws.add_default_event(models.UserPlatformWipe, self.cache_members)
         self.ws.add_default_event(models.UserUpdate, self.cache_members)
@@ -137,7 +163,8 @@ class PyreClient:
             self.cache.messages.set((event.channel_id, event.id), msg)
 
         elif isinstance(event, models.MessageUpdate):
-            old_msg = self.cache.get_message(event.channel_id, event.message_id)
+            old_msg = self.cache.get_message(event.channel_id,
+                                             event.message_id)
             new_msg = event.data
             for n, v in old_msg:
                 attr = getattr(new_msg, n, None)
@@ -163,7 +190,8 @@ class PyreClient:
                                    models.Member(wsclient=self, **member))
 
         elif isinstance(event, models.ServerMemberUpdate):
-            old_member = self.cache.get_member(event.ids.server_id, event.ids.user_id)
+            old_member = self.cache.get_member(event.ids.server_id,
+                                               event.ids.user_id)
             new_member = event.data
             clear = event.clear
             for n, v in old_member:
@@ -175,7 +203,7 @@ class PyreClient:
                 new_member.avatar_info = new_member.user.avatar_info
             if 'Nickname' in clear:
                 new_member.nick = new_member.user.username
-            
+
             keys = (event.ids.server_id, event.ids.user_id)
             self.cache.deleted.set(keys, old_member)
             self.cache.members.delete(keys)
@@ -220,7 +248,8 @@ class PyreClient:
             new_role = event.data
             clear = event.clear
             if old_role:
-                self.cache.deleted.set((event.server_id, event.role_id), old_role)
+                self.cache.deleted.set((event.server_id, event.role_id),
+                                       old_role)
                 self.cache.roles.delete((event.server_id, event.role_id))
                 for n, v in old_role:
                     attr = getattr(new_role, n, None)
@@ -314,20 +343,36 @@ class PyreClient:
         if event.author.bot or event.webhook:
             return
         content = event.content
-        prefix = next((prefix for prefix in self.prefixes if content.startswith(prefix)), None)
+        prefix = next(
+            (prefix for prefix in self.prefixes if content.startswith(prefix)),
+            None)
         if prefix:
             args = content.removeprefix(prefix).split(" ")
-            command = next((cmd for cmd in self.commands if cmd.name == args[0]), None)
-            subcmd = next((cmd for cmd in self.commands if cmd.subcommand == args[1]), None)
+            command = next(
+                (cmd for cmd in self.commands if cmd.name == args[0]), None)
+            if not len(command.default_permissions) == len([
+                    perm for perm in event.author.permissions
+                    if perm in command.default_permissions
+            ]):
+                raise PermissionError(
+                    f"You don't have permission to use this command.")
+            subcmd = next((cmd for cmd in self.commands
+                           if len(args) > 1 and cmd.subcommand == args[1]),
+                          None)
             if command and subcmd:
                 args = args[2:]
             elif command and not subcmd:
                 args = args[1:]
-            ctx = models.CommandContext(wsclient=self.ws, command=command, server_id=event.server.id, author_id=event.author_id, channel_id=event.channel_id, message_id=event.id)
+            ctx = models.CommandContext(wsclient=self.ws,
+                                        command=command,
+                                        server_id=event.server.id,
+                                        author_id=event.author_id,
+                                        channel_id=event.channel_id,
+                                        message_id=event.id)
             verified_args = {}
             for arg in args:
                 for cmd_arg in command.args:
+                    if not issubclass(type(arg), cmd_arg.type):
+                        raise ValidationError("Invalid argument type.")
                     verified_args[f"{cmd_arg.name}"] = arg
             await command.callback(ctx, **verified_args)
-
-
