@@ -112,3 +112,6 @@ class VoiceChannel(BaseChannel):
 
 TYPE_ALL_CHANNEL = Union[TextChannel, DMChannel, VoiceChannel, GroupChannel,
                          SavedMessage]
+
+MESSAGEABLE = TextChannel | DMChannel | GroupChannel
+SERVER_CHANNELS = TextChannel | VoiceChannel

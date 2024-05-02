@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from .ws import WSClient
 import pyre.models as models
 from pydantic_extra_types import color
@@ -19,6 +20,7 @@ class PyreClient:
         self.http.client = self
         self.prefixes = prefixes
         self.commands: List[models.BaseCommand] = []
+        self.extensions = []
 
 
     async def astart(self):
@@ -55,10 +57,35 @@ class PyreClient:
         def decorator(callback):
             if not asyncio.iscoroutinefunction(callback):
                 raise TypeError("Command must be a coroutine")
-            if not name:
-                name = callback.__name__
-            args = callback.
-            cmd = models.BaseCommand(wsclient=self, name=name, description=description, aliases=aliases, args=)
+
+            command_name = callback.__name__ if not name else name
+
+            # Use inspect to get the function's parameters and their names
+            signature = inspect.signature(callback)
+            args = []
+
+            for param_name, param in signature.parameters.items():
+                if param_name == 'self':
+                    continue
+                if not issubclass(param.annotation, models.CommandContext):
+                    arg = models.CommandArg(
+                            name=param_name,
+                            type=param.annotation if param.annotation != inspect.Parameter.empty else str
+                        )
+                    args.append(arg)
+            # Create and register the command
+            cmd = models.BaseCommand(
+                wsclient=self.ws,
+                name=command_name,
+                description=description,
+                aliases=aliases,
+                args=args,
+                callback=callback
+            )
+            self.commands.append(cmd)
+
+            # Return the original callback
+            return callback
         return decorator
 
     def register_default_listeners(self):
@@ -67,8 +94,7 @@ class PyreClient:
         self.ws.add_default_event(models.MessageDelete, self.cache_messages)
         #
         self.ws.add_default_event(models.ServerMemberJoin, self.cache_members)
-        self.ws.add_default_event(models.ServerMemberUpdate,
-                                  self.cache_members)
+        self.ws.add_default_event(models.ServerMemberUpdate, self.cache_members)
         self.ws.add_default_event(models.ServerMemberLeave, self.cache_members)
         self.ws.add_default_event(models.UserPlatformWipe, self.cache_members)
         self.ws.add_default_event(models.UserUpdate, self.cache_members)
@@ -83,6 +109,8 @@ class PyreClient:
         self.ws.add_default_event(models.ServerCreate, self.cache_servers)
         self.ws.add_default_event(models.ServerUpdate, self.cache_servers)
         self.ws.add_default_event(models.ServerDelete, self.cache_servers)
+        #
+        self.ws.add_default_event(models.Message, self.resolve_command)
 
     @property
     def user(self) -> models.User:
@@ -267,5 +295,39 @@ class PyreClient:
                 idr = r"^[a-zA-Z0-9_-]+$"
                 self.cache.messages.delete_many((channel.id, re.compile(idr)))
 
+    def load_extension(self, extension_name):
+        try:
+            extension = __import__(extension_name)
+            self.extensions.append(extension)
+            print(f'Extension {extension_name} loaded successfully.')
+        except Exception as e:
+            print(f'Failed to load extension {extension_name}: {e}')
+
+    def unload_extension(self, extension_name):
+        try:
+            self.extensions.remove(extension_name)
+            print(f'Extension {extension_name} unloaded successfully.')
+        except ValueError:
+            print(f'Extension {extension_name} not found.')
+
     async def resolve_command(self, event: models.Message):
-        pass
+        if event.author.bot or event.webhook:
+            return
+        content = event.content
+        prefix = next((prefix for prefix in self.prefixes if content.startswith(prefix)), None)
+        if prefix:
+            args = content.removeprefix(prefix).split(" ")
+            command = next((cmd for cmd in self.commands if cmd.name == args[0]), None)
+            subcmd = next((cmd for cmd in self.commands if cmd.subcommand == args[1]), None)
+            if command and subcmd:
+                args = args[2:]
+            elif command and not subcmd:
+                args = args[1:]
+            ctx = models.CommandContext(wsclient=self.ws, command=command, server_id=event.server.id, author_id=event.author_id, channel_id=event.channel_id, message_id=event.id)
+            verified_args = {}
+            for arg in args:
+                for cmd_arg in command.args:
+                    verified_args[f"{cmd_arg.name}"] = arg
+            await command.callback(ctx, **verified_args)
+
+

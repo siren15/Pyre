@@ -14,13 +14,13 @@ I want to achieve a wrapper that will be stable, easy to use and understand.
 - Raw methods for interacting with the API I deemed neccessary
 - Recieving events from the API
 - Sending messages, embeds, uploading to the API
+- Basic Commands system
 
 **What needs to be done?**
 
 - Adding methods to models
 - Proper rate limiting and rate limit prevention
 - Documentation
-- Commands system
 - Extension system
 - Improvements, making stuff more efficient
 - More stuff, idk...
@@ -31,11 +31,11 @@ I want to achieve a wrapper that will be stable, easy to use and understand.
 `Python 3.10+ needed.`
 
 ```python
-import os
 import pyre.models as models
 from pyre import PyreClient
+import os
 
-bot = PyreClient('YOUR TOKEN HERE')
+bot = PyreClient(os.getenv('token'), ["!", "+"])
 
 
 @bot.listen(models.ClientReady)
@@ -47,12 +47,11 @@ async def on_ready():
 
 @bot.listen(models.Message)
 async def send_message(message: models.Message):
-    # example on building embeds, embeds don't have fields in revolt, but I'm thinking on adding a system like that that will use description
     if message.content == '+ina' and message.author.bot is False:
         embed = models.Embed()
         embed.title = "INA"
         embed.icon_url = "https://media.tenor.com/images/3b4e1e628bb5778cc1b27b66a3f6b5d3/tenor.gif"
-        embed.media = 'tenor-3608348314.gif' # media field is uploading an image file to revolt, like an attachment
+        embed.media = 'tenor-3608348314.gif'
         embed.description = "INA"
         embed.colour = "#6d5f7b"
         await message.channel.send(embed=embed)
@@ -67,6 +66,10 @@ async def udpate_message(message: models.MessageUpdate):
 async def memupd(event: models.ServerRoleCreate):
     print(event.before)
     print(event.after)
+
+@bot.command()
+async def repeat(ctx: models.CommandContext, text:str):
+    await ctx.reply(text)
 
 bot.start()
 ```
