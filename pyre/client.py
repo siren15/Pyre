@@ -343,6 +343,8 @@ class PyreClient:
         if event.author.bot or event.webhook:
             return
         content = event.content
+        if not content:
+            return
         prefix = next(
             (prefix for prefix in self.prefixes if content.startswith(prefix)),
             None)
@@ -350,12 +352,14 @@ class PyreClient:
             args = content.removeprefix(prefix).split(" ")
             command = next(
                 (cmd for cmd in self.commands if cmd.name == args[0]), None)
-            if not len(command.default_permissions) == len([
+            if not command:
+                return
+            if command and not len(command.default_permissions) == len([
                     perm for perm in event.author.permissions
                     if perm in command.default_permissions
             ]):
                 raise PermissionError(
-                    f"You don't have permission to use this command.")
+                    "You don't have permission to use this command.")
             subcmd = next((cmd for cmd in self.commands
                            if len(args) > 1 and cmd.subcommand == args[1]),
                           None)
