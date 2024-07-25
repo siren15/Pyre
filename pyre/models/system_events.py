@@ -1,5 +1,4 @@
 from typing import Union
-from pydantic import Field as field
 from .base import SystemEvent
 
 
@@ -52,6 +51,11 @@ class ChannelOwnershipChanged(SystemEvent):
 
 
 SYS_EVENT_MSGS = Union[Text, UserAdded, UserRemoved, UserJoined, UserLeft,
+                       UserKicked, UserBanned, ChannelRenamed,
+                       ChannelDescriptionChanged, ChannelIconChanged,
+                       ChannelOwnershipChanged]
+
+SYS_EVENTS_LIST = [Text, UserAdded, UserRemoved, UserJoined, UserLeft,
                        UserKicked, UserBanned, ChannelRenamed,
                        ChannelDescriptionChanged, ChannelIconChanged,
                        ChannelOwnershipChanged]

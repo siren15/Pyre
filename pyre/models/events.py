@@ -1,4 +1,4 @@
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Union
 from pydantic import Field as field, FilePath
 from datetime import datetime
 from .base import PyreEvent, PyreObject, ServerEvent, ChanelEvent, MessageEvent, MemberEvent
@@ -12,8 +12,8 @@ from .role import Role
 from .emoji import ServerParent
 
 
-class Message(PyreEvent):
-    """This is an event. Dispatched when a message is created. Alias: MessageCreate"""
+class MessageCreate(PyreEvent):
+    """Dispatched when a message is created"""
     event_type: str = field(alias='type', repr=False)
     id: str = field(alias='_id')
     channel_id: str = field(alias="channel")
@@ -54,9 +54,6 @@ class Message(PyreEvent):
                     spoiler_attachments: bool = False,
                     mention: bool = False):
         return await self.client.http.reply(self.channel_id, self.id, content, attachments, file, embeds, embed, masquerade, interactions, spoiler_attachments, mention)
-
-
-MessageCreate = Message
 
 
 class MessageUpdate(MessageEvent):
@@ -299,3 +296,66 @@ class EmojiCreate(PyreEvent):
 class EmojiDelete(PyreEvent):
     event_type: str = field(alias='type', repr=False)
     id: str
+
+EVENTS = [
+    MessageCreate,
+    MessageUpdate,
+    MessageAppend,
+    MessageDelete,
+    MessageReact,
+    MessageUnreact,
+    MessageRemoveReaction,
+    ChannelCreate,
+    ChannelUpdate,
+    ChannelDelete,
+    ChannelGroupJoin,
+    ChannelGroupLeave,
+    ChannelStartTyping,
+    ChannelStopTyping,
+    ChannelAck,
+    ServerCreate,
+    ServerUpdate,
+    ServerDelete,
+    ServerMemberUpdate,
+    ServerMemberJoin,
+    ServerMemberLeave,
+    ServerRoleUpdate,
+    ServerRoleCreate,
+    ServerRoleDelete,
+    UserUpdate,
+    UserRelationship,
+    UserPlatformWipe,
+    EmojiCreate,
+    EmojiDelete
+]
+
+LISTENERS = Union[
+    MessageCreate,
+    MessageUpdate,
+    MessageAppend,
+    MessageDelete,
+    MessageReact,
+    MessageUnreact,
+    MessageRemoveReaction,
+    ChannelCreate,
+    ChannelUpdate,
+    ChannelDelete,
+    ChannelGroupJoin,
+    ChannelGroupLeave,
+    ChannelStartTyping,
+    ChannelStopTyping,
+    ChannelAck,
+    ServerCreate,
+    ServerUpdate,
+    ServerDelete,
+    ServerMemberUpdate,
+    ServerMemberJoin,
+    ServerMemberLeave,
+    ServerRoleUpdate,
+    ServerRoleDelete,
+    UserUpdate,
+    UserRelationship,
+    UserPlatformWipe,
+    EmojiCreate,
+    EmojiDelete
+]
