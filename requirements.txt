@@ -1,7 +1,7 @@
 pydantic
 pydantic-extra-types
 attrs
-aiohttp
+httpx
 websockets
 python-dateutil
 cacheout
