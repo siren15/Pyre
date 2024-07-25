@@ -1,31 +1,40 @@
 import asyncio
+import inspect
 import json
+import functools
+
+from typing import List, TYPE_CHECKING
 from websockets import client as  ws_client
 from .errors import LabelMe, InternalError, InvalidSession, OnboardingNotFinished, AlreadyAuthenticated
-from .models import SavedMessage, DMChannel, GroupChannel, TextChannel, VoiceChannel, ChannelCreate, Server, User, Member, ServerEmoji, DetachedEmoji, Role, Listener
+from .models import TextChannel, VoiceChannel, Server, User, Member, Role, Listener
 from .cache import ClientCache
 from .http import HTTPClient
+from .logger import LOG
 
+if TYPE_CHECKING:
+    from .client import PyreClient
+
+DEFAULT_EVENTS: List[Listener] = list()
+EVENTS: List[Listener] = list()
 
 class WSClient:
-
     def __init__(self, token: str, version: int = 1):
         self.url = 'wss://ws.revolt.chat'
         self.token = token
         self.version = version
         self.websocket = None
-        self.events = []
-        self.default_events = []
+        self.events = EVENTS
+        self.default_events = DEFAULT_EVENTS
         self.cache = ClientCache()
         self.http = HTTPClient(self.token)
-        self.client = None
+        self.client: 'PyreClient' = None
 
     async def connect(self):
         try:
             self.websocket = await ws_client.connect(
                 uri=f"{self.url}?token={self.token}&version={self.version}")
         except Exception as e:
-            print(e)
+            LOG.error(e)
 
         while True:
             message = await self.websocket.recv()
@@ -34,7 +43,7 @@ class WSClient:
     async def handle_message(self, message):
         event = json.loads(message)
         if event['type'] == "Bulk":
-            for event in message['v']:
+            for event in event['v']:
                 await self._handle_message(event)
         else:
             await self._handle_message(event)
@@ -45,8 +54,9 @@ class WSClient:
         if event_type == "Error":
             self.handle_error(event.get("error"))
         elif event_type == "Authenticated":
-            pass # print("Pyre lit!")
+            LOG.debug("Pyre lit!")
         elif event_type == "Ready":
+            LOG.debug('Ready')
             await self.on_ready(event)
         else:
             await self.on_event(event)
@@ -90,12 +100,12 @@ class WSClient:
         #             DetachedEmoji(wsclient=self.client, **emoji))
 
         me = await self.http.fetch_self()
-        self.client.cache.bot.set('me', User(wsclient=self.client, **me))
+        self.cache.bot.set('me', User(wsclient=self.client, **me))
         
 
         for listener in self.events:
             listener: Listener = listener
-            if listener.name == 'ClientReady':
+            if listener.name in ['ClientReady', 'OnReady', 'Ready']:
                 await listener.callback()
 
     def handle_error(self, error_id):
@@ -109,6 +119,16 @@ class WSClient:
             raise OnboardingNotFinished()
         elif error_id == "AlreadyAuthenticated":
             raise AlreadyAuthenticated()
+    
+    def resolve_event_args(self, callback, event, payload):
+        signature = inspect.signature(callback)
+        args = {}
+        for param_name, param in signature.parameters.items():
+            if param_name == 'self':
+                args['self'] = self.client
+            else:
+                args[param_name] = event(wsclient=self.client, **payload)
+        return args
 
     async def on_event(self, raw_event: dict):
         event_name = raw_event['type']
@@ -116,17 +136,7 @@ class WSClient:
             payload = {'channel':raw_event}
         else:
             payload = raw_event
-        def_events = [listener.callback(listener.event(wsclient=self.client, **payload)) for listener in self.default_events if listener.name == event_name]
-        await asyncio.gather(*def_events)
-        events = [listener.callback(listener.event(wsclient=self.client, **payload)) for listener in self.events if listener.name == event_name]
-        await asyncio.gather(*events)
-
-    def add_event(self, event, callback):
-        event_name = event.__name__
-        listener = Listener(event_name, event, callback)
-        self.events.append(listener)
-
-    def add_default_event(self, event, callback):
-        event_name = event.__name__
-        listener = Listener(event_name, event, callback)
-        self.default_events.append(listener)
+        def_events = [functools.partial(listener.callback, **self.resolve_event_args(listener.callback, listener.event, payload)) for listener in self.default_events if listener.name == event_name]
+        await asyncio.gather(*[func() for func in def_events])
+        events = [functools.partial(listener.callback, **self.resolve_event_args(listener.callback, listener.event, payload)) for listener in self.events if listener.name == event_name]
+        await asyncio.gather(*[func() for func in events])
