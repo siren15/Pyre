@@ -14,3 +14,5 @@ from .emoji import *
 from .client_events import *
 from .command import *
 from .context import BaseContext, CommandContext
+
+EVENTS_ALL = EVENTS + SYS_EVENTS_LIST + CL_ERRS
