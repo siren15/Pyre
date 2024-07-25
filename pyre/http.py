@@ -1,68 +1,53 @@
 from datetime import datetime
-import aiohttp
+import httpx
 import asyncio
-from .errors import InvalidSession
+from .errors import InvalidSession, HTTPError, InternalError
 import pyre.models as models
-from typing import List, Literal
+from typing import Any, List, Literal
 from .enums import UserRemove, ChannelRemove, Permissions, MessageSort
 from .utils import validate_display_name, random_string_generator, validate_colour
-from pyre import errors
-
+from .logger import LOG
+from httpx._types import (
+    QueryParamTypes,
+    RequestContent,
+    RequestData,
+    RequestFiles,
+)
 
 class HTTPClient:
 
     def __init__(self, token: str):
         self.token = token
         self.base_url = 'https://api.revolt.chat/'
-        self.session = None
+        self.session = httpx.AsyncClient()
         self.client = None
 
-    async def login(self):
-        """ "Log in." aka Create a aiohttp session."""
-        self.session = aiohttp.ClientSession()
-
-    async def request(self, method: str, path: str, base_url: str = None, extra_headers: dict = None, **kwargs):
-        """
-        The request function is a wrapper for the aiohttp.request function that handles http requests for the client.
-
-        Args:
-            self: Represent the instance of the class
-            method: Specify the http method to use
-            path: Specify the endpoint of the api
-            **kwargs: Pass a variable number of keyword arguments to the function
-
-        Returns:
-            A json object
-        """
+    async def request(self, method: str, path: str, base_url: str = None, extra_headers: dict = None, content: RequestContent | None = None, data: RequestData | None = None, files: RequestFiles | None = None, json: Any | None = None, params: QueryParamTypes | None = None):
         if base_url:
             url = base_url + path
         else:
             url = self.base_url + path
-        headers = {'x-bot-token': self.token}
+        headers = {'X-Bot-Token': self.token}
         if extra_headers:
             headers.update(extra_headers)
-        kwargs.setdefault('headers', headers)
-        async with self.session.request(method, url, **kwargs) as response:
-            if response.status == 401:
+        while True:
+            response = await self.session.request(method, url, headers=headers, content=content, data=data, files=files, json=json, params=params)
+            if response.status_code == 401:
                 raise InvalidSession()
-            elif response.status == 429:  # Rate limited
+            elif response.status_code == 429:  # Rate limited
                 retry_after = response.headers.get('X-RateLimit-Reset-After')
                 if retry_after:
                     retry_after = int(retry_after) / 1000  # Convert to seconds
-                    print(
-                        f"Rate limited. Retrying after {retry_after} seconds.")
+                    LOG.warn(f"Rate limited. Retrying after {retry_after} seconds.")
                     await asyncio.sleep(retry_after)
-                    return await self.request(method, path, **kwargs)
                 else:
-                    print(
-                        "Rate limited. No 'X-RateLimit-Reset-After' header provided."
-                    )
+                    LOG.warn("Rate limited. No 'X-RateLimit-Reset-After' header provided.")
             else:
-                return await response.json()
+                return response.json()
 
     async def close(self):
         """Close the aiohttp session."""
-        await self.session.close()
+        await self.session.aclose()
 
     async def fetch_self(self):
         """Fetch thyself"""
@@ -356,18 +341,17 @@ class HTTPClient:
             fn = f'SPOILER_{file.file_name}'
         else:
             fn = file.file_name
-        form = aiohttp.FormData()
-        form.add_field("file", f.read(), filename=fn)
+        files = {'upload-file': (fn, f)}
 
-        resp = await self.session.post(url, data=form, headers=headers)
-        resp_json = await resp.json()
+        resp = await self.session.post(url, files=files, headers=headers)
+        resp_json = resp.json()
 
-        resp_code = resp.status
+        resp_code = resp.status_code
 
         if resp_code == 400:
-            raise errors.HTTPError(resp_json)
+            raise HTTPError(resp_json)
         elif 500 <= resp_code <= 600:
-            raise errors.InternalError(resp_json)
+            raise InternalError(resp_json)
         else:
             return {'id': resp_json["id"], "url": f'{url}/{resp_json["id"]}'}
 
