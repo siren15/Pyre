@@ -38,3 +38,10 @@ def random_string_generator(r: int = 8):
     for i in range(0, r):
         result += random.choice(characters)
     return result
+
+def correct_event_name_formatting(event_name:str):
+    event_name = event_name.removeprefix('on_').removesuffix('_')
+    if '_' in event_name:
+        return ''.join(word.capitalize() for word in event_name.split('_'))
+    else:
+        return event_name.capitalize()
