@@ -14,7 +14,7 @@ I want to achieve a wrapper that will be stable, easy to use and understand.
 - Raw methods for interacting with the API I deemed neccessary
 - Recieving events from the API
 - Sending messages, embeds, uploading to the API
-- Basic Commands system
+- Basic Command system
 
 **What needs to be done?**
 
@@ -38,15 +38,15 @@ import os
 bot = PyreClient(os.getenv('token'), ["!", "+"])
 
 
-@bot.listen(models.ClientReady)
+@bot.listen()
 async def on_ready():
     print(f'{bot.user.username} fed to the Pyre!')
     latency = await bot.latency() * 1000
     print(f"Bot's latency: {latency:.0f}ms")
 
 
-@bot.listen(models.Message)
-async def send_message(message: models.Message):
+@bot.listen() # you can create listeners by writing the event name as the function name
+async def message_create(message: models.Message):
     if message.content == '+ina' and message.author.bot is False:
         embed = models.Embed()
         embed.title = "INA"
@@ -57,7 +57,7 @@ async def send_message(message: models.Message):
         await message.channel.send(embed=embed)
 
 
-@bot.listen(models.MessageUpdate)
+@bot.listen(models.MessageUpdate) # or you can specify which event to listen to by providing the appropriate model - and have any function name (the preferred method)
 async def udpate_message(message: models.MessageUpdate):
     print(message.before)
     print(message.after)
