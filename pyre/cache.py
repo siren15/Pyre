@@ -1,5 +1,14 @@
 from cacheout import CacheManager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
+
+from .models import (
+    Member,
+    User,
+    Server,
+    TYPE_ALL_CHANNEL,
+    Role,
+    TextMessage
+)
 if TYPE_CHECKING:
     from cacheout import Cache
 
@@ -54,47 +63,47 @@ class ClientCache:
         self.deleted_roles: "Cache" = self.cache["deleted"]
         self.deleted: "Cache" = self.cache["deleted"]
 
-    def get_member(self, server_id: str, member_id: str):
+    def get_member(self, server_id: str, member_id: str) -> Member:
         return self.members.get((server_id, member_id))
 
-    def get_members(self, server_id: str):
+    def get_members(self, server_id: str) -> List[Member]:
         return [
             member for member in list(self.members.values())
             if member.server_id == server_id
         ]
 
-    def get_channel(self, channel_id: str):
+    def get_channel(self, channel_id: str) -> TYPE_ALL_CHANNEL:
         return self.channels.get(channel_id)
 
-    def get_channels(self, server_id: str):
+    def get_channels(self, server_id: str) -> List[TYPE_ALL_CHANNEL]:
         server = self.get_server(server_id)
         return server.channels
 
-    def get_role(self, server_id: str, role_id: str):
+    def get_role(self, server_id: str, role_id: str) -> Role:
         return self.roles.get((server_id, role_id))
 
-    def get_roles(self, server_id):
+    def get_roles(self, server_id) -> List[Role]:
         return [
             role for role in list(self.roles.values())
             if role.server_id == server_id
         ]
 
-    def get_server(self, server_id: str):
+    def get_server(self, server_id: str) -> Server:
         return self.servers.get(server_id)
 
-    def get_servers(self):
+    def get_servers(self) -> List[Server]:
         return [server for server in list(self.servers.values())]
 
-    def get_user(self, user_id: str):
+    def get_user(self, user_id: str) -> User:
         return self.users.get(user_id)
 
-    def get_message(self, channel_id: str, message_id: str):
+    def get_message(self, channel_id: str, message_id: str) -> TextMessage:
         return self.messages.get((channel_id, message_id))
 
-    def get_deleted_member(self, server_id: str, member_id: str):
+    def get_deleted_member(self, server_id: str, member_id: str) -> Member:
         return self.deleted_members.get((server_id, member_id))
 
-    def get_deleted_user(self, user_id: str):
+    def get_deleted_user(self, user_id: str) -> User:
         return self.deleted_members.get(user_id)
 
     def delete_user_from_cache(self, user_id: str):
@@ -102,7 +111,7 @@ class ClientCache:
         self.deleted_members.set(user_id, user)
         self.users.delete(user_id)
 
-    def get_deleted_message(self, channel_id: str, message_id: str):
+    def get_deleted_message(self, channel_id: str, message_id: str) -> TextMessage:
         return self.deleted_messages.get((channel_id, message_id))
 
     def delete_message_from_cache(self, channel_id: str, message_id: str):
@@ -121,8 +130,8 @@ class ClientCache:
         self.deleted_roles.set((server_id, role.id), role)
         self.roles.delete((server_id, role.id))
 
-    def get_deleted_role(self, server_id: str, role_id: str):
+    def get_deleted_role(self, server_id: str, role_id: str) -> Role:
         return self.deleted_roles.get((server_id, role_id))
 
-    def get_deleted_channel(self, channel_id: str):
+    def get_deleted_channel(self, channel_id: str) -> TYPE_ALL_CHANNEL:
         return self.deleted.get(channel_id)
