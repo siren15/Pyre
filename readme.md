@@ -1,6 +1,6 @@
 # **Pyre**
 
-### ![](https://autumn.revolt.chat/attachments/_2UsmLFHBOWEELm4Tzx-wJTusxWAf4RJuVHpUo8OBp/Pyre_20230629112501.png?width=100)
+### ARCHIVED! DEVELOPMENT MOVED TO GITEA
 
 ### **A** [**Revolt.chat**](https://revolt.chat) **API bot wrapper**
 
@@ -73,3 +73,4 @@ async def repeat(ctx: models.CommandContext, text:str):
 
 bot.start()
 ```
+
